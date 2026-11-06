@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 
 const START = "# >>> model-switch global hooks >>>";
 const END = "# <<< model-switch global hooks <<<";
+const CREATED_TABLE = "# model-switch created this hooks table";
 export const engineRoot = path.resolve(fileURLToPath(new URL("../../", import.meta.url)));
 export const engineScript = path.join(engineRoot, "src", "hooks", "reflex-hook.js");
 
@@ -16,41 +17,53 @@ export function globalConfigPath(env = process.env) {
   return path.join(codexHome(env), "config.toml");
 }
 
-function tomlLiteral(value) { return `'${value.replaceAll("'", "''")}'`; }
+function tomlLiteral(value) { return JSON.stringify(value); }
 
-export function managedHookBlock(root = engineRoot) {
+export function managedHookBlock(root = engineRoot, includeTable = false) {
   const script = path.join(root, "src", "hooks", "reflex-hook.js");
   const envFile = path.join(root, ".env");
   const command = `node "--env-file-if-exists=${envFile}" "${script}"`;
   const hook = `{ type = "command", command = ${tomlLiteral(command)}, timeout = 5 }`;
   return [START,
-    `user_prompt_submit = [{ hooks = [${hook}] }]`,
-    `pre_tool_use = [{ matcher = "^(Bash|apply_patch|Edit|Write)$", hooks = [${hook}] }]`,
-    `post_tool_use = [{ matcher = "^(Bash|apply_patch|Edit|Write)$", hooks = [${hook}] }]`,
+    ...(includeTable ? [CREATED_TABLE, "[hooks]"] : []),
+    `UserPromptSubmit = [{ hooks = [${hook}] }]`,
+    `PreToolUse = [{ matcher = "^(Bash|apply_patch|Edit|Write)$", hooks = [${hook}] }]`,
+    `PostToolUse = [{ matcher = "^(Bash|apply_patch|Edit|Write)$", hooks = [${hook}] }]`,
     END].join("\n");
 }
 
 export function removeManagedHooks(text) {
-  const pattern = new RegExp(`(?:\\r?\\n)?${START.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}[\\s\\S]*?${END.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?:\\r?\\n)?`, "g");
-  return text.replace(pattern, "\n").replace(/\n{3,}/g, "\n\n").trimEnd() + "\n";
+  const escape = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const created = new RegExp(`\\r?\\n${escape(START)}\\r?\\n${escape(CREATED_TABLE)}[\\s\\S]*?${escape(END)}\\r?\\n`, "g");
+  const existing = new RegExp(`(?:\\r?\\n|^)${escape(START)}[\\s\\S]*?${escape(END)}`, "g");
+  return text.replace(created, "").replace(existing, "");
 }
 
 export function installIntoConfig(text, root = engineRoot) {
-  if (inspectIntegration(text, root).installed && inspectIntegration(text, root).occurrences === 1) return text;
+  if (inspectIntegration(text, root).installed) return text;
   const clean = removeManagedHooks(text || "");
+  // Never create duplicate TOML keys or overwrite somebody else's lifecycle hooks.
+  if (/^\s*(?:UserPromptSubmit|PreToolUse|PostToolUse)\s*=/m.test(clean) ||
+      /^\s*\[\[?hooks\.(?:UserPromptSubmit|PreToolUse|PostToolUse)(?:\.|\])/m.test(clean)) {
+    throw new Error("Existing lifecycle hooks in config.toml overlap model-switch. Move those hooks to ~/.codex/hooks.json before installing; Codex merges both sources.");
+  }
   const block = managedHookBlock(root);
-  const hooksHeader = /^\[hooks\]\s*$/m;
+  const hooksHeader = /^[ \t]*\[hooks\][ \t]*(?:#[^\r\n]*)?\r?$/m;
   if (hooksHeader.test(clean)) return clean.replace(hooksHeader, (match) => `${match}\n${block}`);
-  const childHeader = /^\[hooks\./m;
-  if (childHeader.test(clean)) return clean.replace(childHeader, `[hooks]\n${block}\n\n$&`);
-  return `${clean.trimEnd()}\n\n[hooks]\n${block}\n`;
+  const childHeader = /^[ \t]*\[\[?hooks\./m;
+  const created = `\n${managedHookBlock(root, true)}\n`;
+  if (childHeader.test(clean)) return clean.replace(childHeader, `${created}$&`);
+  return `${clean}${created}`;
 }
 
 export function inspectIntegration(text, root = engineRoot) {
   const occurrences = text.split(START).length - 1;
   const script = path.join(root, "src", "hooks", "reflex-hook.js");
-  return { installed: occurrences === 1 && text.includes(script), occurrences,
-    conflict: occurrences > 1 || (occurrences === 1 && !text.includes(path.join(root, "src", "hooks", "reflex-hook.js"))) };
+  const normalized = text.replaceAll("\r\n", "\n");
+  const installed = occurrences === 1 && (normalized.includes(managedHookBlock(root)) || normalized.includes(managedHookBlock(root, true)));
+  const hasEngine = text.includes(script) || text.includes(script.replaceAll("\\", "\\\\"));
+  return { installed, occurrences, outdated: occurrences === 1 && !installed && hasEngine,
+    conflict: occurrences > 1 || (occurrences === 1 && !hasEngine) };
 }
 
 async function exists(filename) { try { await stat(filename); return true; } catch { return false; } }

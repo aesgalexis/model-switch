@@ -5,7 +5,7 @@ import { spawn } from "node:child_process";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { installCodexIntegration, installIntoConfig, inspectIntegration, removeManagedHooks, uninstallCodexIntegration } from "../src/reflex/codex-integration.js";
+import { installCodexIntegration, installIntoConfig, inspectIntegration, managedHookBlock, removeManagedHooks, uninstallCodexIntegration } from "../src/reflex/codex-integration.js";
 import { buildReport } from "../src/reflex/report.js";
 import { knownWorkspaces, resolveWorkspace } from "../src/reflex/workspace.js";
 
@@ -94,4 +94,68 @@ test("managed config helpers avoid duplicate logical hook blocks", () => {
   const once = installIntoConfig(base); const twice = installIntoConfig(once);
   assert.equal(once, twice); assert.equal(inspectIntegration(once).occurrences, 1);
   assert.doesNotMatch(removeManagedHooks(once), /model-switch global hooks/);
+});
+
+test("generated Codex TOML uses the exact lifecycle event names without a feature override", () => {
+  const existing = [
+    'model = "gpt-5.6-sol"',
+    '',
+    '[features]',
+    'apps = true',
+    '',
+    '[hooks]',
+    'SessionStart = [{ hooks = [{ type = "command", command = "foreign" }] }]',
+    '',
+  ].join("\n");
+  const installed = installIntoConfig(existing);
+  assert.match(installed, /^\[hooks\]\n# >>> model-switch global hooks >>>\nUserPromptSubmit = /m);
+  for (const name of ["UserPromptSubmit", "PreToolUse", "PostToolUse"]) {
+    assert.match(installed, new RegExp(`^${name} = \\[\\{`, "m"));
+    assert.equal((managedHookBlock().match(new RegExp(`^${name} = `, "gm")) ?? []).length, 1);
+  }
+  assert.doesNotMatch(managedHookBlock(), /^\s*(user_prompt_submit|pre_tool_use|post_tool_use)\s*=/m);
+  assert.doesNotMatch(installed, /^hooks\s*=\s*true\s*$/m);
+  assert.equal(installIntoConfig(installed), installed);
+  assert.equal(removeManagedHooks(installed), existing);
+});
+
+test("install and uninstall restore TOML without a preexisting hooks table", () => {
+  for (const existing of [
+    'model = "gpt-5.6-sol"\n',
+    'model = "gpt-5.6-sol"',
+    '[hooks.state]\ntrusted_hash = "foreign"\n',
+    ' [hooks] # existing hooks\nSessionStart = []\n',
+  ]) {
+    const installed = installIntoConfig(existing);
+    assert.equal(inspectIntegration(installed).installed, true);
+    assert.equal(installIntoConfig(installed), installed);
+    assert.equal(removeManagedHooks(installed), existing);
+  }
+});
+
+test("installer refuses overlapping foreign lifecycle hooks without producing invalid TOML", () => {
+  for (const config of ['[hooks]\nPreToolUse = []\n', '[[hooks.PostToolUse]]\nmatcher = "Bash"\n']) {
+    assert.throws(() => installIntoConfig(config), /Existing lifecycle hooks/);
+  }
+});
+
+test("installer recognizes CRLF config and safely quotes engine paths with apostrophes", () => {
+  const root = path.resolve("engine's checkout");
+  const installed = installIntoConfig("", root);
+  assert.equal(inspectIntegration(installed.replaceAll("\n", "\r\n"), root).installed, true);
+  assert.equal(inspectIntegration(installed, root).conflict, false);
+  assert.ok(managedHookBlock(root).includes(JSON.stringify(`node "--env-file-if-exists=${path.join(root, ".env")}" "${path.join(root, "src", "hooks", "reflex-hook.js")}"`)));
+});
+
+test("installer migrates the previous lowercase block and preserves unrelated TOML", () => {
+  const oldBlock = managedHookBlock().replaceAll("UserPromptSubmit", "user_prompt_submit")
+    .replaceAll("PreToolUse", "pre_tool_use").replaceAll("PostToolUse", "post_tool_use");
+  const existing = `[hooks]\n${oldBlock}\n\n[features]\napps = true\n`;
+  assert.equal(inspectIntegration(existing).installed, false);
+  const migrated = installIntoConfig(existing);
+  assert.equal(inspectIntegration(migrated).installed, true);
+  assert.equal(inspectIntegration(migrated).occurrences, 1);
+  assert.match(migrated, /\[features\]\napps = true\n/);
+  assert.doesNotMatch(migrated, /^user_prompt_submit\s*=/m);
+  assert.equal(installIntoConfig(migrated), migrated);
 });

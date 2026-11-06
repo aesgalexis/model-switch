@@ -90,10 +90,11 @@ the `PreToolUse` and `PostToolUse` points below for Bash in Codex CLI. The layer
 records metadata, maintains local evidence and generations, and rewrites only
 exact allowlisted deterministic queries. Every other operation remains unchanged.
 
-Codex Desktop currently sends shell work through a specialized
-`custom_tool_call: exec` route that does not traverse this lifecycle hook path.
-Accordingly, CLI is the supported measurement environment for reliable reflex
-telemetry at this stage.
+Codex CLI 0.155.1 is the verified lifecycle environment. The official
+[hooks documentation](https://learn.chatgpt.com/docs/hooks) now covers unified
+exec and local calls from code mode, with specialized-path exceptions. Earlier
+Desktop measurements missed the lifecycle; current Desktop support remains
+unverified and requires a client/version-specific smoke test.
 
 ### PreToolUse
 
@@ -128,12 +129,15 @@ Initial reversible optimization.
 
 Current behavior:
 
-- select only valid same-session, same-workspace, same-generation repo root,
+- select only valid same-workspace, same-generation repo root,
   branch, HEAD, and bounded working-tree facts
 - apply a short age bound in addition to generation checks
 - emit the documented `hookSpecificOutput.additionalContext` response in
   `inject` mode
 - compute the same candidate without changing context in `observe` mode
+- default to `inject`; `off` disables selection and injection
+- permit fresh prompt facts across sessions, while exact tool-result reuse stays
+  session-bound
 - omit the hint entirely on missing, stale, mismatched, or malformed evidence
 
 Prompt text, transcripts, file contents, commands, logs, and evidence-store

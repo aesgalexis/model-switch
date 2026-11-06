@@ -41,7 +41,7 @@ export async function diagnoseReflex({ root = projectRoot, cwd = process.cwd(), 
   if (!hookScriptExists) warnings.push("Project hook script missing: src/hooks/reflex-hook.js");
   let hooks = null;
   try { hooks = JSON.parse(await readFile(hooksFile, "utf8")); }
-  catch { warnings.push("Project hooks missing or invalid: .codex/hooks.json"); }
+  catch { if (!integration.installed) warnings.push("Project hooks missing or invalid: .codex/hooks.json"); }
   const projectHookStatus = Object.fromEntries(hookEvents.map((name) => {
     const configured = Array.isArray(hooks?.hooks?.[name]) && hooks.hooks[name].some((entry) =>
       Array.isArray(entry.hooks) && entry.hooks.some((hook) =>
@@ -54,6 +54,7 @@ export async function diagnoseReflex({ root = projectRoot, cwd = process.cwd(), 
   const projectDuplicate = integration.installed && Object.values(projectHookStatus).some(Boolean);
   if (projectDuplicate) warnings.push("Project-local model-switch hooks duplicate the global integration");
   if (integration.conflict) warnings.push("Global model-switch hook block is duplicated or points at another engine");
+  if (integration.outdated) warnings.push("Global model-switch hooks are outdated; run npm run install:codex to migrate them");
   const logInfo = await fileInfo(log);
   const stateInfo = await fileInfo(stateFile);
   let stateReadable = false;
@@ -96,7 +97,7 @@ export function formatDoctor(report) {
     `Event log: ${report.log.path} (${size(report.log)})`,
     `State: ${report.state.path} (${size(report.state)}, ${report.state.readable ? "readable" : "unreadable"})`,
     `Workspace generation: ${report.state.generation ?? "—"} | evidence: ${report.state.evidence ?? "—"}`,
-    ...(report.warnings.length ? report.warnings.map((warning) => `WARNING: ${warning}`) : ["OK: no local warnings (Codex project trust is not checked)."]),
+    ...(report.warnings.length ? report.warnings.map((warning) => `WARNING: ${warning}`) : ["OK: no local warnings (Codex hook trust is not checked)."]),
   ].join("\n");
 }
 

@@ -47,9 +47,9 @@ Current client boundary:
 
 - Codex CLI traverses the Bash `PreToolUse` and `PostToolUse` lifecycle used by
   the observer
-- Codex Desktop currently uses a specialized `custom_tool_call: exec` route
-  that does not traverse this lifecycle path, so reliable Phase 1 measurement
-  is being performed in CLI
+- Codex CLI 0.155.1 unified exec is verified. Current official docs also cover
+  local calls from code mode, with exceptions; Desktop must be revalidated per
+  client/version rather than assumed universally unsupported
 
 Behavior:
 
@@ -173,7 +173,7 @@ Implemented with `UserPromptSubmit`:
 
 - select only relevant fresh facts
 - emit the documented `additionalContext` hook output in `inject` mode
-- support `off | observe | inject`, defaulting conservatively to `observe`
+- support `off | observe | inject`, defaulting to `inject`
 - correlate injected facts with subsequent orientation checks and fallback reuse
 - compare turns with and without hints as real CLI data accumulates
 
@@ -228,6 +228,12 @@ The first useful demo should be deliberately boring:
 Then expand one behavior at a time.
 
 ## Immediate next objective
+
+The reproducible harness is available as `npm run reflex:benchmark` (mechanism)
+and `npm run reflex:benchmark -- --live --model YOUR_MODEL` (paired fixture).
+See [BENCHMARKS.md](BENCHMARKS.md) for methodology, measured results, and limits.
+The installer migrates legacy event names; CI covers Windows/Linux on Node 22/24.
+The release remains experimental until broader real-session data supports savings.
 
 1. Collect comparable CLI turns with prompt hints off/observed and injected.
 2. Measure whether HEAD, branch, and root orientation checks actually decrease.

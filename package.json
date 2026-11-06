@@ -1,6 +1,6 @@
 {
   "name": "model-switch",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "private": true,
   "description": "Local reflex layer for OpenAI Codex: reuse fresh evidence, gate ambiguous checks with TypeSafe Jev, and optionally route models.",
   "license": "MIT",
@@ -18,7 +18,9 @@
     "install:codex": "node scripts/codex-integration.mjs install",
     "uninstall:codex": "node scripts/codex-integration.mjs uninstall",
     "repo:publish": "node scripts/repo-publish.mjs",
-    "check": "node --check src/config.js && node --check src/request.js && node --check src/router.js && node --check src/server.js && node --check src/stats.js && node --check src/upstream.js && node --check src/reflex/classify.js && node --check src/reflex/events.js && node --check src/reflex/privacy.js && node --check src/reflex/state.js && node --check src/reflex/reuse.js && node --check src/reflex/files.js && node --check src/reflex/hints.js && node --check src/reflex/shadow.js && node --check src/reflex/stats.js && node --check src/reflex/report.js && node --check src/reflex/runtime.js && node --check src/reflex/workspace.js && node --check src/reflex/codex-integration.js && node --check src/reflex/doctor.js && node --check src/reflex/rotate.js && node --check src/hooks/reflex-hook.js && node --check scripts/codex-integration.mjs && node --check scripts/repo-publish.mjs && node --test"
+    "check": "node --check src/config.js && node --check src/request.js && node --check src/router.js && node --check src/server.js && node --check src/stats.js && node --check src/upstream.js && node --check src/reflex/classify.js && node --check src/reflex/events.js && node --check src/reflex/privacy.js && node --check src/reflex/state.js && node --check src/reflex/reuse.js && node --check src/reflex/files.js && node --check src/reflex/hints.js && node --check src/reflex/shadow.js && node --check src/reflex/stats.js && node --check src/reflex/report.js && node --check src/reflex/runtime.js && node --check src/reflex/workspace.js && node --check src/reflex/codex-integration.js && node --check src/reflex/doctor.js && node --check src/reflex/rotate.js && node --check src/hooks/reflex-hook.js && node --check scripts/codex-integration.mjs && node --check scripts/codex-hook-smoke.mjs && node --check scripts/repo-publish.mjs && node --check scripts/reflex-benchmark.mjs && node --check scripts/lib/codex-process.mjs && node --test",
+    "reflex:smoke": "node scripts/codex-hook-smoke.mjs",
+    "reflex:benchmark": "node scripts/reflex-benchmark.mjs"
   },
   "repository": {
     "type": "git",

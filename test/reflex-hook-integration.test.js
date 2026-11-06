@@ -57,7 +57,7 @@ test("hook preserves identity reuse across a working-tree mutation", async () =>
     const rewriteRaw = invokeHook(hookInput("PreToolUse", "git rev-parse HEAD", "head-2"), logPath);
     const rewrite = JSON.parse(rewriteRaw);
     assert.equal(rewrite.hookSpecificOutput.permissionDecision, "allow");
-    assert.match(rewrite.hookSpecificOutput.updatedInput.command, /Console.*Out.*Write/);
+    assert.match(rewrite.hookSpecificOutput.updatedInput.command, process.platform === "win32" ? /Console.*Out.*Write/ : /^printf /);
     invokeHook(hookInput("PostToolUse", rewrite.hookSpecificOutput.updatedInput.command, "head-2", { exit_code: 0, output: head }), logPath);
 
     const mutation = hookInput("PostToolUse", "*** Begin Patch", "mutation", { ok: true });
@@ -109,7 +109,7 @@ test("hook learns and reuses an exact read-only compound until a dependency chan
 
     const rewrite = JSON.parse(invokeHook(hookInput("PreToolUse", command, "compound-2"), logPath));
     assert.equal(rewrite.hookSpecificOutput.permissionDecision, "allow");
-    assert.match(rewrite.hookSpecificOutput.updatedInput.command, /Console.*Out.*Write/);
+    assert.match(rewrite.hookSpecificOutput.updatedInput.command, process.platform === "win32" ? /Console.*Out.*Write/ : /^printf /);
     invokeHook(hookInput("PostToolUse", rewrite.hookSpecificOutput.updatedInput.command, "compound-2", { exit_code: 0, output }), logPath);
 
     const mutation = hookInput("PostToolUse", "*** Begin Patch", "compound-edit", { ok: true });

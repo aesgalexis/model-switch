@@ -1,0 +1,130 @@
+{
+  "schema": 1,
+  "kind": "live-cli-paired-fixture",
+  "createdAt": "2026-11-06T09:49:43.746Z",
+  "runtime": {
+    "node": "v24.13.0",
+    "platform": "win32",
+    "model": "gpt-6-luna",
+    "engine": "0.3.0/reflex-5",
+    "codex": "codex-cli 0.155.1"
+  },
+  "prompt": "Inspect this repository's orientation. Report the current branch and full HEAD commit. Use fresh provided facts if sufficient. Do not modify files or run tests.",
+  "pairs": 3,
+  "summary": {
+    "off": {
+      "runs": 3,
+      "medianElapsedMs": 26138,
+      "medianHookProcessMs": null,
+      "toolCalls": 3,
+      "orientationOperations": 5,
+      "confirmedReuse": 0,
+      "injectedFacts": 0,
+      "hintBytes": 0,
+      "inputTokens": 94704,
+      "outputTokens": 597
+    },
+    "inject": {
+      "runs": 3,
+      "medianElapsedMs": 7047,
+      "medianHookProcessMs": null,
+      "toolCalls": 0,
+      "orientationOperations": 0,
+      "confirmedReuse": 0,
+      "injectedFacts": 12,
+      "hintBytes": 1092,
+      "inputTokens": 40602,
+      "outputTokens": 120
+    },
+    "observedToolCallDifference": 3,
+    "estimatedChecksAvoided": null,
+    "note": "Small paired fixture experiment; observed differences are not a causal savings estimate for normal sessions."
+  },
+  "samples": [
+    {
+      "pair": 1,
+      "mode": "off",
+      "elapsedMs": 23982,
+      "hookProcessMs": [],
+      "inputTokens": 27083,
+      "outputTokens": 238,
+      "toolCalls": 1,
+      "orientationOperations": 1,
+      "actualReuse": 0,
+      "injectedFacts": 0,
+      "hintBytes": 0,
+      "answerVerified": true
+    },
+    {
+      "pair": 1,
+      "mode": "inject",
+      "elapsedMs": 6888,
+      "hookProcessMs": [],
+      "inputTokens": 13534,
+      "outputTokens": 40,
+      "toolCalls": 0,
+      "orientationOperations": 0,
+      "actualReuse": 0,
+      "injectedFacts": 4,
+      "hintBytes": 364,
+      "answerVerified": true
+    },
+    {
+      "pair": 2,
+      "mode": "inject",
+      "elapsedMs": 7047,
+      "hookProcessMs": [],
+      "inputTokens": 13534,
+      "outputTokens": 39,
+      "toolCalls": 0,
+      "orientationOperations": 0,
+      "actualReuse": 0,
+      "injectedFacts": 4,
+      "hintBytes": 364,
+      "answerVerified": true
+    },
+    {
+      "pair": 2,
+      "mode": "off",
+      "elapsedMs": 33366,
+      "hookProcessMs": [],
+      "inputTokens": 27041,
+      "outputTokens": 178,
+      "toolCalls": 1,
+      "orientationOperations": 2,
+      "actualReuse": 0,
+      "injectedFacts": 0,
+      "hintBytes": 0,
+      "answerVerified": true
+    },
+    {
+      "pair": 3,
+      "mode": "off",
+      "elapsedMs": 26138,
+      "hookProcessMs": [],
+      "inputTokens": 40580,
+      "outputTokens": 181,
+      "toolCalls": 1,
+      "orientationOperations": 2,
+      "actualReuse": 0,
+      "injectedFacts": 0,
+      "hintBytes": 0,
+      "answerVerified": true
+    },
+    {
+      "pair": 3,
+      "mode": "inject",
+      "elapsedMs": 7420,
+      "hookProcessMs": [],
+      "inputTokens": 13534,
+      "outputTokens": 41,
+      "toolCalls": 0,
+      "orientationOperations": 0,
+      "actualReuse": 0,
+      "injectedFacts": 4,
+      "hintBytes": 364,
+      "answerVerified": true
+    }
+  ],
+  "source": "Working tree based on d6bcc7d during 0.3.1 preparation"
+}

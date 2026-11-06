@@ -71,7 +71,7 @@ export function outputCommand(value, originalCommand, platform = process.platfor
   if (platform === "win32") {
     return `try { [Console]::Out.Write(${quotePowerShell(value)}) } catch { ${originalCommand} }`;
   }
-  return `printf '%s' ${quotePosix(value)} || ${originalCommand}`;
+  return `printf '%s' ${quotePosix(value)} || ( ${originalCommand} )`;
 }
 
 export function planActualReuse(state, { operation, session, commandHash, platform = process.platform, cwd = null }) {

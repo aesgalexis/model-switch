@@ -1,10 +1,22 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import { fingerprint } from "../src/reflex/privacy.js";
-import { preToolUseRewrite, safePlanActualReuse } from "../src/reflex/reuse.js";
+import { outputCommand, preToolUseRewrite, safePlanActualReuse } from "../src/reflex/reuse.js";
 
 const session = "session";
 const workspaceId = "workspace";
+
+test("cached output preserves quotes and newlines without executing compound fallback", () => {
+  const value = "cached 'quote'\nsecond line\n";
+  const platform = process.platform;
+  const command = outputCommand(value, "echo FALLBACK_ONE; echo FALLBACK_TWO", platform);
+  const result = platform === "win32"
+    ? spawnSync("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", command], { encoding: "utf8", windowsHide: true })
+    : spawnSync("sh", ["-c", command], { encoding: "utf8" });
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.stdout.replaceAll("\r\n", "\n"), value);
+});
 
 function operation(command, key, family = key.startsWith("git.") ? "git" : "filesystem") {
   return { command, key, family, access: "read-only", eligible: true };

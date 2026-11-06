@@ -1,260 +1,165 @@
 # model-switch
 
-A local reflex layer for OpenAI Codex.
+[![CI](https://github.com/aesgalexis/model-switch/actions/workflows/ci.yml/badge.svg)](https://github.com/aesgalexis/model-switch/actions/workflows/ci.yml)
 
-**Reuse fresh evidence, use TypeSafe Jev for bounded semantic judgments, and let Codex do the expensive work only when necessary.**
+A local reflex layer for OpenAI Codex: reuse fresh evidence and supply small
+workspace facts before the agent repeats orientation work.
 
-> Experimental. This project is unofficial and is not affiliated with OpenAI or TypeSafe.
+**Experimental · MIT · unofficial.** Not affiliated with OpenAI or TypeSafe.
+The model/reasoning router remains an optional, separate prototype.
 
-## Why
+## What it does
 
-Coding agents spend a surprising amount of time re-checking things they just learned:
-
-- Is this the repository?
-- What branch am I on?
-- Is the worktree clean?
-- Did the deploy finish?
-- Is production already on this commit?
-- Do I really need to inspect GitHub again?
-- Is there enough evidence to continue, or should I verify?
-
-Some of those questions are deterministic. Some are fuzzy. Very few deserve a full Codex reasoning cycle every time.
-
-model-switch is evolving from a pure model router into a **local reflex layer** that sits around Codex tool use.
-
-```text
-                         local evidence
-                              |
-                              v
-Codex -> tool call -> PreToolUse gate
-                         |
-                +--------+--------+
-                |                 |
-          deterministic         ambiguous
-             answer               |
-                |                 v
-                |                Jev
-                |          reuse / refresh
-                |                 |
-                +--------+--------+
-                         |
-                  enough evidence?
-                    /         \
-                  yes          no
-                   |            |
-              skip/rewrite   run tool
-                                |
-                                v
-                           PostToolUse
-                                |
-                                v
-                         update evidence
-```
-
-The goal is not to make Jev know the repository. The goal is to let normal code track facts, let Jev make small semantic decisions over those facts, and fall back to Codex whenever uncertainty remains.
-
-## Design principles
-
-### 1. Facts first
-
-If code can know something exactly, code should answer it.
-
-Examples:
-
-- repository root
-- branch
-- HEAD
-- dirty/clean state
-- known deploy revision
-- last build/test result
-- timestamps and workspace generation
-
-Jev should not be asked to rediscover deterministic state.
-
-### 2. Jev as a semantic gate
-
-Jev is useful for bounded questions such as:
-
-- Is this evidence sufficient to skip another verification?
-- Does this tool call appear to be repeating a fresh observation?
-- Should this state be reused or refreshed?
-- Is this deployment evidence strong enough to continue?
-
-A low-confidence answer must **fail open**: Codex performs the original check.
-
-### 3. Evidence has provenance
-
-Cached state is only useful if we know where it came from and when it stopped being valid.
-
-A future evidence record will look roughly like:
-
-```json
-{
-  "kind": "git.status",
-  "value": "clean",
-  "source": "Bash",
-  "observedAt": "2026-09-21T10:42:17Z",
-  "workspaceGeneration": 41,
-  "repoHead": "8c41de2"
-}
-```
-
-Any potentially mutating operation advances the workspace generation. Evidence from an older generation is not silently reused.
-
-### 4. Hooks, not prompt tricks
-
-Current Codex supports lifecycle hooks including `PreToolUse`, `PostToolUse`, and `UserPromptSubmit`.
-
-The intended integration is:
-
-- `PreToolUse`: inspect a pending local tool call and decide whether fresh evidence can satisfy it.
-- `PostToolUse`: observe completed tool results and update the evidence store.
-- `UserPromptSubmit`: later, inject a tiny amount of relevant fresh state before Codex starts re-orienting itself.
-
-Hooks remain a useful optimization layer, not a security boundary.
-
-### 5. Conservative by default
-
-- Read-only checks first.
-- No suppression of mutations in the first implementation.
-- No aggressive context rewriting.
-- Short Jev timeouts.
-- Confidence gates.
-- Fail open on errors, stale evidence, unknown commands, or low confidence.
-- Keep the behavior observable and reversible.
-
-## Architecture
-
-The project is moving toward three layers:
-
-| Layer | Job | Intelligence |
+| Layer | Responsibility | Status |
 | --- | --- | --- |
-| **L0 - facts** | Track deterministic repository/tool state | normal code |
-| **L1 - judgment** | Decide reuse vs refresh when the answer is semantic | TypeSafe Jev |
-| **L2 - execution** | Investigate, reason, edit, test, deploy | Codex |
+| Facts | Classify calls, record bounded evidence, invalidate after mutations | Implemented |
+| Deterministic reuse | Serve exact supported repeated reads from valid evidence | Implemented |
+| Prompt hints | Supply workspace, branch, HEAD and bounded working-tree facts | Implemented; `inject` by default |
+| TypeSafe Jev | Judge related evidence as reuse / refresh / uncertain | Optional, shadow only |
+| Model router | Recommend or route model and reasoning effort via a local proxy | Separate experiment |
 
-See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+Reusing a result still executes the surrounding Codex tool call. It can avoid
+the underlying Git/read/search operation. Prompt hints might prevent Codex from
+choosing that call; that separate benefit needs a comparable experiment.
+There is **no established savings percentage for normal sessions**.
 
-## Current status
+## Install for Codex CLI
 
-### Implemented today
-
-The repository currently contains the original **model + reasoning router prototype**:
-
-```text
-Codex Desktop / CLI
-        |
-        v
-model-switch localhost proxy
-        |
-        +--> Jev: model + effort
-        |
-        v
-OpenAI Codex backend
-```
-
-It supports:
-
-- `observe` mode
-- `route` mode
-- confidence gating
-- short Jev timeout
-- fail-open passthrough
-- local statistics
-- normal ChatGPT/Codex authentication forwarding
-
-This code is staying in the project, but model routing is now a **secondary module**, not the main purpose.
-
-### Next implementation
-
-The next milestone is the reflex path:
-
-1. local evidence store
-2. `PostToolUse` observation for a tiny allowlist of read-only Bash/Git checks
-3. `PreToolUse` duplicate-check detection
-4. deterministic reuse without Jev where possible
-5. Jev `reuse | refresh | uncertain` gate where semantics are required
-6. metrics comparing avoided checks vs fallbacks
-7. only then consider `UserPromptSubmit` context injection
-
-See [docs/ROADMAP.md](docs/ROADMAP.md).
-
-## Existing router quick start
-
-The original routing prototype still works independently of the future hook layer.
-
-Requirements:
-
-- Node.js 20+
-- Codex signed in normally with ChatGPT
-- TypeSafe API key for Jev decisions
+Use Node.js 22 or 24 and a signed-in Codex CLI. The real-CLI smoke test targets
+Codex 0.155.1; CI tests the engine on Windows/Linux with Node 22/24.
 
 ```powershell
 git clone https://github.com/aesgalexis/model-switch.git
 cd model-switch
-npm install
-
-$env:TYPESAFE_API_KEY="YOUR_KEY"
-npm start
+git checkout reflex-phase1-observe
+npm ci
+npm run install:codex
+npm run reflex:doctor
 ```
 
-Health check:
+Until [PR #1](https://github.com/aesgalexis/model-switch/pull/1) is merged, use
+the development branch above; `main` does not contain the reflex implementation.
+
+The installer adds an idempotent marked block to `~/.codex/config.toml`, creates
+a timestamped backup, and preserves other settings. Re-running it migrates older
+lowercase event names to `UserPromptSubmit`, `PreToolUse`, and `PostToolUse`.
+If another inline hook uses the same event, installation stops before writing;
+move those declarations to `~/.codex/hooks.json`, which Codex merges with TOML.
+
+Review and trust the installed hooks in Codex (`/hooks` in CLI). Restart existing
+CLI sessions after configuration changes. `doctor` checks configuration and local
+files; it cannot certify that Codex has trusted or executed the hooks.
+
+Then run `codex` normally inside any project. The engine runs directly from this
+checkout, which must remain at this location. Update with `git pull`, followed by
+`npm ci` if dependencies changed. Remove its managed integration with
+`npm run uninstall:codex`.
+
+## Client compatibility
+
+Codex CLI is the validated environment. `exec_command` reaches the hooks as
+`Bash`, including completion after a `write_stdin` poll. The official
+[hooks documentation](https://learn.chatgpt.com/docs/hooks) also covers local
+function calls and calls from code mode, with specialized-path exceptions.
+Earlier Desktop measurements missed this lifecycle; current Desktop support
+remains unverified. Validate each client/version before relying on its telemetry.
 
 ```powershell
-Invoke-RestMethod http://127.0.0.1:8317/health
+npm run reflex:smoke
+npm run reflex:smoke -- --legacy
 ```
 
-Without `TYPESAFE_API_KEY`, the proxy starts as plain passthrough.
+The smoke test uses a scripted localhost model endpoint, isolated configuration,
+and no real model or subscription credentials. It checks all three events and
+confirms lowercase names do not fire. Only generated test hooks bypass interactive
+hook trust for that subprocess; normal installation does not bypass trust.
+Windows test subprocesses enable the documented elevated sandbox.
 
-See [examples/codex-config.toml](examples/codex-config.toml) for the provider configuration.
-
-## Router modes
-
-### `observe` - default
-
-Jev recommends a model and reasoning effort, but the request is unchanged.
-
-### `route`
+## Inspect and measure
 
 ```powershell
-$env:MODEL_SWITCH_MODE="route"
-npm start
+npm run reflex:doctor
+npm run reflex:stats
+npm run reflex:stats -- --workspace C:\path\to\project
+npm run reflex:stats -- --all
+npm run reflex:rotate
+npm run reflex:benchmark -- --pairs 3 --output .model-switch/benchmarks/mechanism.json
+npm run reflex:benchmark -- --live --model YOUR_MODEL --pairs 3 --output .model-switch/benchmarks/live.json
 ```
 
-The request is rewritten only when both Jev confidence values clear `MODEL_SWITCH_MIN_CONFIDENCE`.
+The default benchmark tests the mechanism without a model. `--live` consumes
+subscription/API usage using your local Codex login and an explicitly chosen
+model. It alternates off/inject order, uses identical warm facts and fresh
+sessions, validates branch/HEAD answers, and records elapsed time, calls and usage.
+See [benchmark protocol and results](docs/BENCHMARKS.md).
 
-### `off`
+Each canonical workspace has isolated `state.json` and `events.jsonl` under
+`~/.codex/model-switch-global/workspaces/<hashed-id>/`. Consumer repositories
+receive no runtime files. Set `MODEL_SWITCH_GLOBAL_HOME` to relocate data, or
+`MODEL_SWITCH_REFLEX_LOG` for an explicit log with adjacent `reflex-state.json`.
+Rotation preserves evidence and prior logs; it also accepts `--workspace` / `--all`.
 
-Plain local passthrough. Jev is not consulted.
+## Reuse and configuration
 
-## Configuration
+Exact candidates include HEAD/branch/root queries, selected status/diff forms,
+complete file reads, bounded searches/listings, and safe semicolon compounds
+whose every component independently qualifies. Partial reads, ambiguous shell
+structures, stale evidence and unknown operations execute normally.
 
-See [.env.example](.env.example).
+Tool-result reuse requires the same session/workspace and valid generations.
+File reads also check size and modification time. Known edits invalidate affected
+paths; other mutations invalidate applicable identity/workspace/external domains.
+Edits, tests, builds and deploys are never skipped. Changes outside the observed
+hook stream can escape generation tracking: this is an experimental cache, not
+an authoritative filesystem monitor.
 
-The `MODEL_SWITCH_MODE` and routing-specific variables currently apply to the **existing model-router prototype**. The reflex layer will receive its own explicit settings as it is implemented rather than overloading these controls.
+| Setting | Default | Effect |
+| --- | --- | --- |
+| `MODEL_SWITCH_PROMPT_HINT_MODE` | `inject` | `off`, `observe` (candidate only), or `inject` |
+| `MODEL_SWITCH_PROMPT_HINT_MAX_AGE_MS` | `300000` | Age bound for prompt facts, including cross-session facts |
+| `MODEL_SWITCH_REFLEX_CACHE_MAX_BYTES` | `32768` | Output limit; hard maximum 256 KiB |
+| `MODEL_SWITCH_REFLEX_JEV_SHADOW` | `on` | Shadow evaluation when a TypeSafe key exists; `off` disables |
+
+Hints may reuse fresh facts across sessions in the same workspace; exact result
+reuse remains session-bound. A location hint can precede any Git evidence.
+See [.env.example](.env.example) for all settings.
 
 ## Privacy
 
-The current proxy does not log prompts or authorization headers.
+Telemetry contains redacted command diagnostics, semantic keys and hashed IDs,
+without tool-response bodies. Local evidence can contain bounded read output;
+common credential files, detected secrets and oversized output keep fingerprints
+only. Filters are heuristic. Keep runtime data local and inspect before sharing.
 
-Jev is remote. In the existing router, TypeSafe receives the latest user request required for the routing decision, capped by `MODEL_SWITCH_MAX_ROUTING_TEXT`.
+The optional reflex Jev gate receives bounded metadata, without repository
+contents, tool output or transcripts. The separate router sends the latest user
+request to TypeSafe, capped by `MODEL_SWITCH_MAX_ROUTING_TEXT`. The proxy does not
+log prompts or authorization headers. Errors and uncertain decisions fail open.
 
-The reflex architecture is intended to send Jev only the **small bounded state required for a decision**, not whole repository contents or full Codex transcripts.
+## Optional model router
 
-## References
+```powershell
+Copy-Item .env.example .env
+# Set TYPESAFE_API_KEY in .env for Jev recommendations.
+npm start
+Invoke-RestMethod http://127.0.0.1:8317/health
+```
 
-- [OpenAI Codex hooks](https://developers.openai.com/docs/hooks)
-- [OpenAI Codex advanced configuration](https://developers.openai.com/docs/config-file/config-advanced)
-- [TypeSafe AI / Jev](https://typesafe.ai/)
-- [TypeSafe JavaScript SDK](https://github.com/typesafe-ai/typesafe-sdk-js)
+Use [examples/codex-config.toml](examples/codex-config.toml) for provider setup.
+`MODEL_SWITCH_MODE=observe` records recommendations without rewriting requests;
+`route` applies them above the confidence threshold; `off` is passthrough.
+Missing Jev credentials also mean passthrough. Router and reflex settings differ.
 
 ## Development
 
 ```powershell
-npm test
+npm ci
 npm run check
 ```
 
-## License
+`check` runs syntax checks and tests. CI covers Windows/Linux and Node 22/24.
+The guarded `npm run repo:publish -- "Commit message"` validates, commits all
+non-ignored changes and pushes the branch; inspect your changes first.
 
-MIT.
+See [architecture](docs/ARCHITECTURE.md), [roadmap](docs/ROADMAP.md),
+[changelog](CHANGELOG.md), and [release preparation](docs/RELEASE.md).

@@ -31,14 +31,10 @@ Codex 0.155.1; CI tests the engine on Windows/Linux with Node 22/24.
 ```powershell
 git clone https://github.com/aesgalexis/model-switch.git
 cd model-switch
-git checkout reflex-phase1-observe
 npm ci
 npm run install:codex
 npm run reflex:doctor
 ```
-
-Until [PR #1](https://github.com/aesgalexis/model-switch/pull/1) is merged, use
-the development branch above; `main` does not contain the reflex implementation.
 
 The installer adds an idempotent marked block to `~/.codex/config.toml`, creates
 a timestamped backup, and preserves other settings. Re-running it migrates older

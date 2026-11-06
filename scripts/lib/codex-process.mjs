@@ -7,7 +7,12 @@ export function codexInvocation(executable) {
   if (process.platform === "win32") {
     for (const directory of (process.env.PATH || "").split(path.delimiter)) {
       const script = path.join(directory, "node_modules", "@openai", "codex", "bin", "codex.js");
-      if (existsSync(script)) return { executable: process.execPath, prefix: [script] };
+      if (existsSync(script)) {
+        const architecture = process.arch === "arm64" ? "arm64" : "x64";
+        const target = architecture === "arm64" ? "aarch64-pc-windows-msvc" : "x86_64-pc-windows-msvc";
+        const binary = path.resolve(path.dirname(script), "..", "node_modules", "@openai", "codex-win32-" + architecture, "vendor", target, "bin", "codex.exe");
+        return existsSync(binary) ? { executable: binary, prefix: [] } : { executable: process.execPath, prefix: [script] };
+      }
     }
   }
   return { executable: "codex", prefix: [] };

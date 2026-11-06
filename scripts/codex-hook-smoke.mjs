@@ -76,7 +76,7 @@ try {
   let timer;
   const exitCode = await Promise.race([
     new Promise((resolve, reject) => { child.on("close", resolve); child.on("error", reject); }),
-    new Promise((_, reject) => { timer = setTimeout(() => { child.kill(); reject(new Error("Codex timed out")); }, 30000); }),
+    new Promise((_, reject) => { timer = setTimeout(() => { child.kill(); reject(new Error("Codex timed out: " + output)); }, 60000); }),
   ]).finally(() => clearTimeout(timer));
   const eventsFile = resolveWorkspace(cwd, env).events;
   const events = await readFile(eventsFile, "utf8").then((text) => text.trim().split(/\r?\n/).map(JSON.parse),
